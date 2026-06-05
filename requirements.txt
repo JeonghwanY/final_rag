@@ -4,5 +4,6 @@ rank-bm25
 pymupdf
 python-dotenv
 langgraph
+langchain-aws
 boto3
 pymupdf4llm

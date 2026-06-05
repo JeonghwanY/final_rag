@@ -11,8 +11,7 @@ import os
 from typing import TypedDict, Annotated
 import operator
 from dotenv import load_dotenv
-import boto3
-from botocore.config import Config
+from langchain_aws import ChatBedrockConverse
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 from retriever import HybridRetriever
@@ -20,33 +19,9 @@ from retriever import HybridRetriever
 load_dotenv()
 
 REGION = os.getenv("bedrock_REGION", "ap-northeast-2")
-LLM_MODEL_ID = "anthropic.claude-3-5-sonnet-20240620-v1:0"
+LLM_MODEL_ID = os.getenv("LLM_MODEL_ID", "anthropic.claude-3-5-sonnet-20240620-v1:0")
 
-
-class BedrockClaude:
-    def __init__(self, model_id: str, region: str, temperature: float = 0.0):
-        self.model_id = model_id
-        self.temperature = temperature
-        self.client = boto3.client(
-            service_name="bedrock-runtime",
-            region_name=region,
-            config=Config(
-                connect_timeout=5,
-                read_timeout=3600,  # Claude Sonnet 계열은 긴 read timeout 권장
-                retries={"max_attempts": 1, "mode": "standard"},
-            ),
-        )
-
-    def invoke(self, prompt: str) -> str:
-        response = self.client.converse(
-            modelId=self.model_id,
-            messages=[{"role": "user", "content": [{"text": prompt}]}],
-            inferenceConfig={"maxTokens": 1000, "temperature": self.temperature},
-        )
-        return response["output"]["message"]["content"][0]["text"]
-
-
-llm = BedrockClaude(model_id=LLM_MODEL_ID, region=REGION)
+llm = ChatBedrockConverse(model_id=LLM_MODEL_ID, region_name=REGION, temperature=0.0)
 retriever = HybridRetriever()
 MAX_HOPS = 3
 
@@ -67,7 +42,7 @@ def decompose(state: State) -> State:
 질문: {state['question']}
 형식: 질문1 | 질문2 | 질문3"""
 
-    sub_qs = [q.strip() for q in llm.invoke(prompt).split("|")]
+    sub_qs = [q.strip() for q in llm.invoke(prompt).content.split("|")]
     return {**state, "sub_questions": sub_qs, "hop_count": 0}
 
 
@@ -122,7 +97,7 @@ def generate(state: State) -> State:
 
 답변:"""
 
-    return {**state, "answer": llm.invoke(prompt)}
+    return {**state, "answer": llm.invoke(prompt).content}
 
 
 def check(state: State) -> State:
@@ -132,7 +107,7 @@ def check(state: State) -> State:
     need_more = "부족" in llm.invoke(f"""질문: {state['question']}
 답변: {state['answer']}
 
-답변이 질문에 충분히 답했으면 "충분", 더 검색이 필요하면 "부족"만 출력해.""")
+답변이 질문에 충분히 답했으면 "충분", 더 검색이 필요하면 "부족"만 출력해.""").content
 
     if need_more:
         new_qs = [q.strip() for q in llm.invoke(
@@ -140,7 +115,7 @@ def check(state: State) -> State:
 현재 답변: {state['answer']}
 부족한 부분을 채울 추가 검색 질문 1~2개를 만들어줘.
 형식: 질문1 | 질문2"""
-        ).split("|")]
+        ).content.split("|")]
         return {**state, "need_more": True, "sub_questions": new_qs, "hop_count": state["hop_count"] + 1}
 
     return {**state, "need_more": False}
