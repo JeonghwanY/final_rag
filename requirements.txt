@@ -1,0 +1,8 @@
+chromadb
+pdfplumber
+rank-bm25
+pymupdf
+python-dotenv
+langgraph
+boto3
+pymupdf4llm
