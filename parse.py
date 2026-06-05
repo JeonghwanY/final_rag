@@ -25,25 +25,6 @@ def table_page(pdf_path: str) -> list[int]:
                 table_pages.append(i+1) # pdf는 1번부터
     return table_pages
 
-# 텍스트 페이지 추출    
-def text_page(pdf_path: str, table_pages: list[int]) -> dict[int, str]: # 페이지번호 조회하려고
-    doc = fitz.open(pdf_path)
-    result = {}
-    for i, page in enumerate(doc):
-        page_num = i + 1
-        text = page.get_text()      # ← 무조건 추출
-        if text.strip():
-            result[page_num] = text.strip()
-    return result
-
-
-# 복합셀 이미지로 -> 병합셀은 텍스트추출로는 구조파악이 어렵다. claude vision 사용할 것
-def table_image(pdf_path: str, page_num: int) -> bytes:
-    doc = fitz.open(pdf_path)
-    page = doc[page_num - 1] # 페이지 번호는 1부터 시작해서 -1
-    pix = page.get_pixmap(dpi=200) #해상도는 200이 적당
-    return pix.tobytes("png") 
-
 def table_parse(img_bytes: bytes) -> list[dict]:
     """
     Claude Vision으로 복합셀(병합셀) 표 파싱.
@@ -107,38 +88,6 @@ def table_rows_to_text(rows: list[dict]) -> str:
         if parts:
             sentences.append(". ".join(parts) + ".")
     return "\n".join(sentences)
-
-def parse_table_pdfplumber(pdf_path: str, page_num: int) -> list[dict] | None:
-    """
-    pdfplumber로 표 추출 시도.
-    복합셀(병합셀)이 의심되면 None 반환 → Claude로 fallback.
-    """
-    with pdfplumber.open(pdf_path) as pdf:
-        page = pdf.pages[page_num - 1]
-        tables = page.find_tables()
-        
-        all_rows = []
-        for table in tables:
-            rows = table.extract()
-            if not rows or len(rows) < 2:
-                continue
-            
-            # 병합셀 의심 패턴: None/빈 셀 비율 측정
-            total = sum(len(r) for r in rows)
-            empty = sum(1 for r in rows for c in r if c is None or not c.strip())
-            
-            # 30% 이상 비어있으면 복합셀로 판단
-            if empty / max(total, 1) > 0.15 or empty >=5 :
-                return None
-            
-            # 깨끗한 표면 dict로 변환
-            headers = rows[0]
-            for row in rows[1:]:
-                all_rows.append({
-                    h: (v or "") for h, v in zip(headers, row)
-                })
-        
-        return all_rows if all_rows else None
 
 def extract_text_with_placeholders(pdf_path: str, page_num: int) -> tuple[str, list[str]]:
     """
