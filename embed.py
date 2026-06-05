@@ -45,16 +45,14 @@ LEVEL_PATTERNS = [
 ]
 
 
-def split_by_pattern(text: str, pattern: re.Pattern) -> tuple[str, list[tuple[str, str]]] | None:
+def split_by_pattern(text: str, pattern: re.Pattern) -> list[tuple[str, str]] | None:
     matches = list(pattern.finditer(text))
     if not matches:
         return None
-    preamble = text[:matches[0].start()].strip()
-    sections = [
+    return [
         (m.group(1), text[m.start(): (matches[i + 1].start() if i + 1 < len(matches) else len(text))].strip())
         for i, m in enumerate(matches)
     ]
-    return preamble, sections
 
 
 def build_subtree(
@@ -66,11 +64,10 @@ def build_subtree(
         return False
 
     _, pattern = LEVEL_PATTERNS[level_idx]
-    result = split_by_pattern(text, pattern)
-    if result is None:
+    sections = split_by_pattern(text, pattern)
+    if sections is None:
         return build_subtree(text, page, current_id, current_path, level_idx + 1, all_nodes)
 
-    _, sections = result
     level_num = LEVEL_PATTERNS[level_idx][0]
 
     for marker, section_text in sections:
@@ -95,11 +92,9 @@ def build_text_tree(text_docs: list[tuple[int, str]]) -> list[ChunkNode]:
     default_page = text_docs[0][0]
     all_nodes: list[ChunkNode] = []
 
-    l1_result = split_by_pattern(combined, LEVEL_PATTERNS[0][1])
-    if not l1_result:
+    l1_sections = split_by_pattern(combined, LEVEL_PATTERNS[0][1])
+    if not l1_sections:
         return []
-
-    _, l1_sections = l1_result
     seen_markers: dict[str, ChunkNode] = {}  # marker → 노드 참조 (is_leaf 변경 반영용)
 
     for marker, section_text in l1_sections:

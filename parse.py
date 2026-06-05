@@ -81,24 +81,21 @@ def table_rows_to_text(rows: list[dict]) -> str:
     return "\n".join(sentences)
 
 
-def extract_text_with_placeholders(pdf_path: str, page_num: int) -> tuple[str, list[str]]:
+def extract_text_with_placeholders(pdf_path: str, page_num: int) -> str:
     """페이지 텍스트에서 표 영역을 [TABLE_pN_i] placeholder로 치환"""
     with pdfplumber.open(pdf_path) as pdf:
         page = pdf.pages[page_num - 1]
         tables = page.find_tables()
 
         if not tables:
-            return page.extract_text() or "", []
+            return page.extract_text() or ""
 
-        table_ids = []
         table_items = []
         for i, t in enumerate(tables):
-            tid = f"TABLE_p{page_num}_{i+1}"
-            table_ids.append(tid)
             table_items.append({
                 "bbox": t.bbox,
                 "y_top": t.bbox[1],
-                "placeholder": f"[{tid}]",
+                "placeholder": f"[TABLE_p{page_num}_{i+1}]",
             })
 
         words = page.extract_words()
@@ -132,7 +129,7 @@ def extract_text_with_placeholders(pdf_path: str, page_num: int) -> tuple[str, l
         if current_line:
             lines.append(current_line)
 
-        return "\n".join(" ".join(line) for line in lines), table_ids
+        return "\n".join(" ".join(line) for line in lines)
 
 
 def _rows_from_table(table) -> list[dict] | None:
@@ -169,7 +166,7 @@ def parse_all(pdf_path: str) -> list[dict]:
     for i, page in enumerate(doc):
         page_num = i + 1
         if page_num in table_pages:
-            text, _ = extract_text_with_placeholders(pdf_path, page_num)
+            text = extract_text_with_placeholders(pdf_path, page_num)
         else:
             text = page.get_text()
 
