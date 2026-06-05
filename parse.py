@@ -175,14 +175,30 @@ def extract_text_with_placeholders(pdf_path: str, page_num: int) -> tuple[str, l
             )
             if not in_table:
                 non_table_words.append({"y": w['top'], "text": w['text']})
-        
+
         # 단어와 placeholder를 y좌표 순으로 정렬
         all_items = [(w["y"], w["text"]) for w in non_table_words]
         all_items += [(t["y_top"], t["placeholder"]) for t in table_items]
         all_items.sort(key=lambda x: x[0])
-        
-        # 결합
-        text = ' '.join([item[1] for item in all_items])
+
+        # y좌표가 비슷한 항목끼리 같은 줄로 묶고 \n으로 구분
+        # (줄바꿈이 사라지면 (?m)^ 패턴이 매칭 불가 → 계층 분할 실패)
+        LINE_TOLERANCE = 3  # px 이내 차이는 같은 줄로 간주
+        lines: list[list[str]] = []
+        current_y: float | None = None
+        current_line: list[str] = []
+        for y, token in all_items:
+            if current_y is None or abs(y - current_y) > LINE_TOLERANCE:
+                if current_line:
+                    lines.append(current_line)
+                current_line = [token]
+                current_y = y
+            else:
+                current_line.append(token)
+        if current_line:
+            lines.append(current_line)
+
+        text = "\n".join(" ".join(line) for line in lines)
         return text, table_ids
 
 
