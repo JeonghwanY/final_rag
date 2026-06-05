@@ -22,11 +22,10 @@ class HybridRetriever:
 
         leaf_data = self.collection.get(
             where={"is_leaf": 1},
-            include=["documents", "metadatas"],
+            include=["documents"],
         )
         self.leaf_ids = leaf_data["ids"]
         self.leaf_docs = leaf_data["documents"]
-        self.leaf_metas = leaf_data["metadatas"]
 
         self.bm25 = BM25Okapi([tokenize(doc) for doc in self.leaf_docs])
         print(f"[검색기 준비] leaf {len(self.leaf_ids)}개 노드 로드")
