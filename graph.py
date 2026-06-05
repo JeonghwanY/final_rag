@@ -153,7 +153,7 @@ def build_graph():
 def chat():
     app = build_graph()
     config = {"configurable": {"thread_id": "user_1"}}
-    print("=== 암보험 챗봇 (종료: q) ===\n")
+    print("-----계층 문서 전문 챗봇 (종료: q) -----\n")
 
     while True:
         question = input("질문: ").strip()

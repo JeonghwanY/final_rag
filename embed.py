@@ -191,18 +191,18 @@ def save_to_chromadb(
 
 
 def embed_and_store(pdf_path: str, chroma_path: str = "./chroma_db") -> None:
-    print("1. 파싱 중...")
+    print("1. 파싱")
     documents = parse_all(pdf_path)
 
-    print("\n2. Structure-aware 청킹 중...")
+    print("\n2. 청킹")
     nodes = build_all_nodes(documents)
     leaves = sum(1 for n in nodes if n.is_leaf)
     print(f"   전체 {len(nodes)}개 노드 | leaf(검색) {leaves}개 | parent(맥락) {len(nodes) - leaves}개")
     print_tree(nodes)
 
-    print("\n3. 임베딩 + ChromaDB 저장 중...")
+    print("\n3. 임베딩 + vectorDB 저장")
     save_to_chromadb(nodes, source=os.path.basename(pdf_path), chroma_path=chroma_path)
-    print(f"\n✅ '{chroma_path}'에 {len(nodes)}개 노드 저장 완료")
+    print(f"\n'{chroma_path}'에 {len(nodes)}개 노드 저장 완료")
 
 
 if __name__ == "__main__":
