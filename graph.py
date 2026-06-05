@@ -12,9 +12,7 @@ graph.py - LangGraph 기반 멀티홉 RAG 챗봇
     - Parent-child: 조항 맥락과 표 데이터 함께 제공
 """
 
-import os
 from typing import TypedDict, Annotated
-from types import SimpleNamespace
 import operator
 from dotenv import load_dotenv
 import boto3
@@ -48,14 +46,13 @@ class BedrockClaude:
         )
         self.temperature = temperature
 
-    def invoke(self, prompt: str) -> SimpleNamespace:
+    def invoke(self, prompt: str) -> str:
         response = self.client.converse(
             modelId=self.model_id,
             messages=[{"role": "user", "content": [{"text": prompt}]}],
             inferenceConfig={"maxTokens": 1000, "temperature": self.temperature},
         )
-        text = response["output"]["message"]["content"][0]["text"]
-        return SimpleNamespace(content=text)
+        return response["output"]["message"]["content"][0]["text"]
 
 
 llm = BedrockClaude(model_id=LLM_MODEL_ID, region=REGION)
@@ -86,7 +83,7 @@ def decompose(state: State) -> State:
 형식: 질문1 | 질문2 | 질문3"""
 
     response = llm.invoke(prompt)
-    sub_qs = [q.strip() for q in response.content.split("|")]
+    sub_qs = [q.strip() for q in response.split("|")]
     return {**state, "sub_questions": sub_qs, "hop_count": 0}
 
 
@@ -160,7 +157,7 @@ def generate(state: State) -> State:
 답변:"""
 
     response = llm.invoke(prompt)
-    return {**state, "answer": response.content}
+    return {**state, "answer": response}
 
 
 # ── 노드: 답변 충분성 검토 ──────────────────────────────────────────
@@ -178,7 +175,7 @@ def check(state: State) -> State:
 답변이 질문에 충분히 답했으면 "충분", 더 검색이 필요하면 "부족"만 출력해."""
 
     response = llm.invoke(prompt)
-    need_more = "부족" in response.content
+    need_more = "부족" in response
 
     if need_more:
         followup = llm.invoke(
@@ -187,7 +184,7 @@ def check(state: State) -> State:
 부족한 부분을 채울 추가 검색 질문 1~2개를 만들어줘.
 형식: 질문1 | 질문2"""
         )
-        new_qs = [q.strip() for q in followup.content.split("|")]
+        new_qs = [q.strip() for q in followup.split("|")]
         return {
             **state,
             "need_more": True,

@@ -15,7 +15,6 @@ import json
 import boto3
 import chromadb
 from dataclasses import dataclass
-from typing import Optional
 from dotenv import load_dotenv
 from parse import parse_all
 
@@ -79,7 +78,7 @@ LEVEL_PATTERNS = [
 def split_by_pattern(
     text: str,
     pattern: re.Pattern,
-) -> Optional[tuple[str, list[tuple[str, str]]]]:
+) -> tuple[str, list[tuple[str, str]]] | None:
     """
     텍스트를 패턴 위치에서 분할.
 
