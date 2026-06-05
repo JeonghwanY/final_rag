@@ -148,6 +148,27 @@ class HybridRetriever:
             **result["metadatas"][0],  # level, parent_id, chunk_type 등
         }
 
+    def get_ancestors(self, node: dict, seen_ids: set[str]) -> list[dict]:
+        """
+        hit 노드에서 L1 루트까지 모든 조상을 순서대로 반환.
+
+        반환: [L1, L2, ...] (상위 → 하위 순)
+        seen_ids에 방문한 id를 누적해서 중복 삽입 방지.
+        """
+        ancestors = []
+        current = node
+        while True:
+            parent_id = current.get("parent_id", "")
+            if not parent_id or parent_id in seen_ids:
+                break
+            parent = self.get_by_id(parent_id)
+            if not parent:
+                break
+            seen_ids.add(parent_id)
+            ancestors.append(parent)
+            current = parent
+        return list(reversed(ancestors))  # 상위 → 하위 순
+
     # ── 메인 검색 ─────────────────────────────────────────────────
     def search(self, query: str, top_n: int = 5) -> list[dict]:
         """
@@ -161,7 +182,7 @@ class HybridRetriever:
             ]
 
         role 의미:
-            "parent" → 맥락 제공용 (섹션 상위 조항, 표의 소속 섹션)
+            "parent" → 맥락 제공용 (L1까지 전체 조상 체인)
             "child"  → 검색에서 직접 hit된 핵심 내용
         """
         vector_results = self.vector_search(query, top_k=20)
@@ -177,19 +198,16 @@ class HybridRetriever:
                 continue
             seen_ids.add(child_id)
 
-            # parent 먼저 추가 (LLM에게 맥락을 먼저 보여주기 위해)
-            parent_id = child.get("parent_id", "")
-            if parent_id and parent_id not in seen_ids:
-                parent = self.get_by_id(parent_id)
-                if parent:
-                    seen_ids.add(parent_id)
-                    results.append({
-                        "id": parent["id"],
-                        "content": parent["content"],
-                        "role": "parent",
-                        "section_path": parent.get("section_path", ""),
-                        "chunk_type": parent.get("chunk_type", "text"),
-                    })
+            # 루트까지 모든 조상을 먼저 추가 (LLM에게 넓은 맥락을 먼저 제공)
+            ancestors = self.get_ancestors(child, seen_ids)
+            for anc in ancestors:
+                results.append({
+                    "id": anc["id"],
+                    "content": anc["content"],
+                    "role": "parent",
+                    "section_path": anc.get("section_path", ""),
+                    "chunk_type": anc.get("chunk_type", "text"),
+                })
 
             results.append({
                 "id": child_id,
